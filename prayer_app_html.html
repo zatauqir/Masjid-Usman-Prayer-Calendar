@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyPrayer Times - Islamic Prayer App</title>
+    <meta name="description" content="Islamic prayer times for Houston with daily duas and prayer tracking">
+    <meta name="author" content="Your Name Here">
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .font-arabic {
+            font-family: 'Arabic Typesetting', 'Times New Roman', serif;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        // Lucide React icons (simplified versions)
+        const Clock = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>;
+        const Calendar = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+        const CheckCircle = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>;
+        const Settings = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m11-7h-6m-6 0H1m15.5-3.5L19 7m-7 7-1.5 1.5M5 7l1.5 1.5M5 17l1.5-1.5"/></svg>;
+        const BookOpen = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>;
+        const MapPin = () => <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>;
+
+        const PrayerTimeApp = () => {
+            const [currentTime, setCurrentTime] = useState(new Date());
+            const [activeTab, setActiveTab] = useState('today');
+            const [location, setLocation] = useState('Houston, Texas');
+            const [completedPrayers, setCompletedPrayers] = useState(new Set());
+            const [selectedPrayer, setSelectedPrayer] = useState(null);
+            const [showArabic, setShowArabic] = useState(true);
+            const [appName, setAppName] = useState('MyPrayer Times');
+            const [appSubtitle, setAppSubtitle] = useState('الصلوات الخمس');
+
+            // Prayer times for Houston, Texas
+            const [prayerTimes, setPrayerTimes] = useState([
+                { name: 'Fajr', displayName: 'Fajr (Dawn)', time: '05:45', arabic: 'الفجر' },
+                { name: 'Dhuhr', displayName: 'Dhuhr (Midday)', time: '12:30', arabic: 'الظهر' },
+                { name: 'Asr', displayName: 'Asr (Afternoon)', time: '16:00', arabic: 'العصر' },
+                { name: 'Maghrib', displayName: 'Maghrib (Sunset)', time: '18:45', arabic: 'المغرب' },
+                { name: 'Isha', displayName: 'Isha (Night)', time: '20:15', arabic: 'العشاء' }
+            ]);
+
+            const prayerTexts = {
+                Fajr: "بِسْمِ اللهِ الرَّحْمنِ الرَّحِيمِ\\nBismillahir-Rahmanir-Raheem\\nIn the name of Allah, the Most Gracious, the Most Merciful\\n\\nاللهُ أَكْبَرُ\\nAllahu Akbar\\nAllah is the Greatest",
+                Dhuhr: "الْحَمْدُ للّهِ رَبِّ الْعَالَمِينَ\\nAlhamdulillahi Rabbil Alameen\\nAll praise is due to Allah, Lord of all the worlds\\n\\nالرَّحْمـنِ الرَّحِيمِ\\nAr-Rahmanir-Raheem\\nThe Most Gracious, the Most Merciful",
+                Asr: "اهدِنَــــا الصِّرَاطَ المُستَقِيمَ\\nIhdinas-siratal-mustaqeem\\nGuide us to the straight path\\n\\nصِرَاطَ الَّذِينَ أَنعَمتَ عَلَيهِمْ\\nSiratal-latheena an'amta alayhim\\nThe path of those You have blessed",
+                Maghrib: "قُلْ هُوَ اللَّهُ أَحَدٌ\\nQul huwa Allahu ahad\\nSay: He is Allah, the One!\\n\\nاللَّهُ الصَّمَدُ\\nAllahu as-samad\\nAllah, the Eternal, Absolute",
+                Isha: "أَعُوذُ بِاللهِ مِنَ الشَّيْطَانِ الرَّجِيمِ\\nA'udhu billahi min ash-shaytanir-rajeem\\nI seek refuge with Allah from Satan, the accursed\\n\\nرَبَّنَا آتِنَا فِي الدُّنْيَا حَسَنَةً\\nRabbana atina fi'd-dunya hasanatan\\nOur Lord, give us good in this world"
+            };
+
+            useEffect(() => {
+                const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+                return () => clearInterval(timer);
+            }, []);
+
+            const getNextPrayer = () => {
+                const now = currentTime;
+                const currentMinutes = now.getHours() * 60 + now.getMinutes();
+                
+                for (let prayer of prayerTimes) {
+                    const [hours, minutes] = prayer.time.split(':').map(Number);
+                    const prayerMinutes = hours * 60 + minutes;
+                    if (prayerMinutes > currentMinutes) {
+                        return prayer;
+                    }
+                }
+                return prayerTimes[0];
+            };
+
+            const getTimeUntilNextPrayer = () => {
+                const nextPrayer = getNextPrayer();
+                const now = currentTime;
+                const [hours, minutes] = nextPrayer.time.split(':').map(Number);
+                
+                let nextPrayerTime = new Date(now);
+                nextPrayerTime.setHours(hours, minutes, 0, 0);
+                
+                if (nextPrayerTime <= now) {
+                    nextPrayerTime.setDate(nextPrayerTime.getDate() + 1);
+                }
+                
+                const diff = nextPrayerTime - now;
+                const hoursLeft = Math.floor(diff / (1000 * 60 * 60));
+                const minutesLeft = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                
+                return { hours: hoursLeft, minutes: minutesLeft, prayer: nextPrayer };
+            };
+
+            const togglePrayerComplete = (prayerName) => {
+                const key = `${new Date().toDateString()}-${prayerName}`;
+                const newCompleted = new Set(completedPrayers);
+                if (newCompleted.has(key)) {
+                    newCompleted.delete(key);
+                } else {
+                    newCompleted.add(key);
+                }
+                setCompletedPrayers(newCompleted);
+            };
+
+            const isPrayerCompleted = (prayerName) => {
+                const key = `${new Date().toDateString()}-${prayerName}`;
+                return completedPrayers.has(key);
+            };
+
+            const updatePrayerTime = (prayerName, newTime) => {
+                setPrayerTimes(prevTimes => 
+                    prevTimes.map(prayer => 
+                        prayer.name === prayerName 
+                            ? { ...prayer, time: newTime }
+                            : prayer
+                    )
+                );
+            };
+
+            const nextPrayerInfo = getTimeUntilNextPrayer();
+
+            return (
+                <div className="min-h-screen bg-gradient-to-b from-blue-50 to-indigo-100">
+                    <div className="max-w-md mx-auto bg-white shadow-xl min-h-screen">
+                        {/* Header */}
+                        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h1 className="text-xl font-bold">{appName}</h1>
+                                    <p className="text-indigo-100 text-sm">{appSubtitle}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-2xl font-bold">
+                                        {currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                    <p className="text-indigo-100 text-sm flex items-center gap-1 justify-end">
+                                        <MapPin />
+                                        {location}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Navigation Tabs */}
+                        <div className="flex bg-gray-100 border-b">
+                            {[
+                                { id: 'today', label: 'Today', icon: Clock },
+                                { id: 'calendar', label: 'Calendar', icon: Calendar },
+                                { id: 'prayers', label: 'Prayers', icon: BookOpen },
+                                { id: 'settings', label: 'Settings', icon: Settings }
+                            ].map((tab) => {
+                                const Icon = tab.icon;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`flex-1 p-3 text-center flex flex-col items-center gap-1 transition-colors ${
+                                            activeTab === tab.id
+                                                ? 'bg-white text-indigo-600 border-b-2 border-indigo-600'
+                                                : 'text-gray-600 hover:text-indigo-600'
+                                        }`}
+                                    >
+                                        <Icon />
+                                        <span className="text-xs">{tab.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="p-6">
+                            {activeTab === 'today' && (
+                                <div className="space-y-6">
+                                    {/* Next Prayer Countdown */}
+                                    <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                                        <h3 className="text-lg font-semibold text-green-800 mb-2">Next Prayer</h3>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <p className="text-green-700 font-medium">
+                                                    {nextPrayerInfo.prayer.displayName}
+                                                </p>
+                                                <p className="text-green-600 text-sm">
+                                                    at {nextPrayerInfo.prayer.time}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-2xl font-bold text-green-800">
+                                                    {nextPrayerInfo.hours}h {nextPrayerInfo.minutes}m
+                                                </p>
+                                                <p className="text-green-600 text-sm">remaining</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Today's Prayer Schedule */}
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Today's Prayers</h3>
+                                        <div className="space-y-3">
+                                            {prayerTimes.map((prayer) => (
+                                                <div
+                                                    key={prayer.name}
+                                                    className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${
+                                                        isPrayerCompleted(prayer.name)
+                                                            ? 'bg-green-50 border-green-200'
+                                                            : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <button
+                                                            onClick={() => togglePrayerComplete(prayer.name)}
+                                                            className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                                                isPrayerCompleted(prayer.name)
+                                                                    ? 'bg-green-500 border-green-500 text-white'
+                                                                    : 'border-gray-300 hover:border-green-400'
+                                                            }`}
+                                                        >
+                                                            {isPrayerCompleted(prayer.name) && <CheckCircle />}
+                                                        </button>
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <p className={`font-medium ${
+                                                                    isPrayerCompleted(prayer.name) ? 'text-green-800' : 'text-gray-800'
+                                                                }`}>
+                                                                    {prayer.name}
+                                                                </p>
+                                                                {showArabic && (
+                                                                    <p className="text-lg text-gray-600 font-arabic">
+                                                                        {prayer.arabic}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-sm text-gray-500">{prayer.displayName.split('(')[1]?.replace(')', '') || prayer.displayName}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="font-mono text-lg font-semibold text-gray-800">
+                                                            {prayer.time}
+                                                        </p>
+                                                        <button
+                                                            onClick={() => setSelectedPrayer(prayer.name)}
+                                                            className="text-xs text-indigo-600 hover:text-indigo-800"
+                                                        >
+                                                            View Prayer
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'calendar' && (
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold text-gray-800">Prayer Calendar</h3>
+                                    <div className="bg-gray-50 rounded-lg p-4">
+                                        <h4 className="font-semibold text-gray-800 mb-3">
+                                            {new Date().toLocaleDateString('en-US', { 
+                                                weekday: 'long', 
+                                                year: 'numeric', 
+                                                month: 'long', 
+                                                day: 'numeric' 
+                                            })}
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {prayerTimes.map((prayer) => (
+                                                <div key={prayer.name} className="flex justify-between items-center p-3 bg-white rounded border">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium">{prayer.name}</span>
+                                                        {showArabic && <span className="text-gray-600 font-arabic">{prayer.arabic}</span>}
+                                                    </div>
+                                                    <span className="font-mono text-gray-700 font-semibold">{prayer.time}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'prayers' && (
+                                <div className="space-y-4">
+                                    {selectedPrayer ? (
+                                        <div>
+                                            <button
+                                                onClick={() => setSelectedPrayer(null)}
+                                                className="text-indigo-600 hover:text-indigo-800 mb-4 flex items-center gap-1"
+                                            >
+                                                ← Back to Prayer List
+                                            </button>
+                                            <div className="bg-gradient-to-b from-green-50 to-emerald-50 border border-green-200 rounded-lg p-6">
+                                                <div className="flex items-center gap-2 mb-4">
+                                                    <h3 className="text-xl font-bold text-green-800">
+                                                        {selectedPrayer}
+                                                    </h3>
+                                                    {showArabic && (
+                                                        <span className="text-2xl text-green-700 font-arabic">
+                                                            {prayerTimes.find(p => p.name === selectedPrayer)?.arabic}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="prose text-gray-700 leading-relaxed whitespace-pre-line text-right" style={{direction: 'rtl'}}>
+                                                    {prayerTexts[selectedPrayer]}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>
+                                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Prayer Texts & Duas</h3>
+                                            <div className="grid gap-3">
+                                                {prayerTimes.map((prayer) => (
+                                                    <button
+                                                        key={prayer.name}
+                                                        onClick={() => setSelectedPrayer(prayer.name)}
+                                                        className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-lg border transition-colors"
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <BookOpen />
+                                                            <div className="text-left">
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="font-medium text-gray-800">{prayer.name}</p>
+                                                                    {showArabic && (
+                                                                        <span className="text-lg text-gray-600 font-arabic">{prayer.arabic}</span>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-sm text-gray-500">{prayer.displayName}</p>
+                                                            </div>
+                                                        </div>
+                                                        <p className="font-mono text-gray-600">{prayer.time}</p>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {activeTab === 'settings' && (
+                                <div className="space-y-6">
+                                    <h3 className="text-lg font-semibold text-gray-800">Settings</h3>
+                                    
+                                    <div className="space-y-4">
+                                        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                            <h4 className="font-medium text-yellow-800 mb-3">Customize Prayer Times</h4>
+                                            <div className="space-y-3">
+                                                {prayerTimes.map((prayer) => (
+                                                    <div key={prayer.name} className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-medium text-gray-800 w-16">{prayer.name}</span>
+                                                            {showArabic && (
+                                                                <span className="text-gray-600 font-arabic">{prayer.arabic}</span>
+                                                            )}
+                                                        </div>
+                                                        <input
+                                                            type="time"
+                                                            value={prayer.time}
+                                                            onChange={(e) => updatePrayerTime(prayer.name, e.target.value)}
+                                                            className="border border-gray-300 rounded px-2 py-1 text-sm"
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <h4 className="font-medium text-gray-800 mb-2">App Customization</h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">App Name</label>
+                                                    <input
+                                                        type="text"
+                                                        value={appName}
+                                                        onChange={(e) => setAppName(e.target.value)}
+                                                        className="w-full p-2 border border-gray-300 rounded"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                                                    <input
+                                                        type="text"
+                                                        value={location}
+                                                        onChange={(e) => setLocation(e.target.value)}
+                                                        className="w-full p-2 border border-gray-300 rounded"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                            <div>
+                                                <p className="font-medium text-gray-800">Show Arabic Text</p>
+                                                <p className="text-sm text-gray-500">Display prayer names in Arabic</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setShowArabic(!showArabic)}
+                                                className={`w-12 h-6 rounded-full transition-colors ${
+                                                    showArabic ? 'bg-green-500' : 'bg-gray-300'
+                                                }`}
+                                            >
+                                                <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                                                    showArabic ? 'translate-x-6' : 'translate-x-1'
+                                                }`} />
+                                            </button>
+                                        </div>
+
+                                        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                                            <h4 className="font-medium text-blue-800 mb-2">Ready to Publish?</h4>
+                                            <p className="text-sm text-blue-700">
+                                                Your Islamic Prayer App is customized and ready to share! Upload to GitHub and host for free.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="text-center p-4 text-gray-500 text-xs border-t">
+                            <p>© 2024 Islamic Prayer Times App</p>
+                            <p>Made with ❤️ for the Muslim community</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<PrayerTimeApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
